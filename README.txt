@@ -4,8 +4,7 @@ Matplotlib is used for plot generation and PyQT for the window.
 
 TODO:
 
-General:  
-    - Renaming of main file
+General:
     - More commenting
 
 File system:
@@ -21,3 +20,4 @@ Specific functionality:
 Code cleanup
     - remove functionality overlap in methods
     - Maybe? Port matplotlib code to PyQT plotting
+    - Split code into frontend plotting/UI and backend mathieu calculations?  
