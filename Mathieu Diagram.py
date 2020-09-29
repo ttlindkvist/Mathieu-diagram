@@ -1,4 +1,6 @@
 # Author: Thomas Toft Lindkvist
+
+# Matplotlib packages
 import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
@@ -10,8 +12,10 @@ plt.rc("ytick", labelsize=16, right=True, direction="in")
 plt.rc("axes", titlesize=18)
 plt.rc("legend", fontsize=16)
 
-import numpy as np
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
 
+# PyQT5 packages - https://doc.qt.io/
 import PyQt5.Qt
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QSlider, QGraphicsView, QHBoxLayout, QGroupBox, QFormLayout, QSpinBox, QLabel, QCheckBox, QLineEdit
@@ -19,9 +23,8 @@ from PyQt5.QtCore import QCoreApplication
 
 from PyQt5.QtGui import QFont, QDoubleValidator
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-
+# Numpy and scipy
+import numpy as np
 from scipy.special import mathieu_a, mathieu_b
 
 # Units
@@ -34,14 +37,7 @@ Omega = 2*np.pi*RF
 r0 = 0.0092
 z0 = 0.0088
 
-## TODO - Functionality
-    # - Load parameters from file
-    # - Check stability of high and low mass - Color code for each DC
-    # - Plot export image
-    # - Export current settings
-
-## TODO - cleanup
-
+# Defining fonts
 lfont = QFont('Arial', 20)
 mfont = QFont('Arial', 16)
 sfont = QFont('Arial', 12)
@@ -55,13 +51,16 @@ class MplCanvas(FigureCanvasQTAgg):
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, *args, **kwargs):
-
+        # Call the constructor of the parent class QtWidgets.QMainWindow
         super(MainWindow, self).__init__(*args, **kwargs)
+        self.resize(1000, 600)
+        self.setWindowTitle("Mathieu Stability Diagram")
         self.setMouseTracking(True)
 
         self.qs = [np.linspace(0, 1.23978, 100), np.linspace(0.780906, 1.351218, 100), np.linspace(0, 0.780906), np.linspace(1.23978, 1.351218)]
         self.mathieuCurves = [-mathieu_a(0, self.qs[0]), -mathieu_b(1, self.qs[1]), mathieu_a(0, self.qs[2]/2), mathieu_b(1, self.qs[3]/2)]
         
+        # Constants in the q-a plane, where the different mathieu curves cross and form the stable region.
         self.crossings = [0.780906, 1.23978, 1.351218]
         self.RF_q = self.crossings[0]
         self.plot_lims = [[0, 160], [40, -20]]
@@ -71,22 +70,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ms = np.array([68*amu, 88*amu, 78*amu])
         self.charge = 1*ec
 
-        self.centralwidget = QWidget()
-        self.setCentralWidget(self.centralwidget)
-        self.resize(1000, 600)
-        self.setWindowTitle("Mathieu Stability Diagram")
         self.create_UI()
 
         self.updateMass()
         self.show()
     def create_UI(self):
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
         self.DPI = 100
         self.canvas = MplCanvas(self, width=6, height=4, dpi=self.DPI)
 
         # RF Slider
+        # Scaling to use to ensure the output is in [0, 1]
         self.RF_slider_scaling = 1/500
         self.RF_slider = QSlider(self)
-        self.RF_slider.setMaximum(500)
+        self.RF_slider.setMaximum(int(1/self.RF_slider_scaling))
         self.RF_slider.setMinimum(0)
         self.RF_slider.setValue((self.crossings[0]/self.crossings[1])/self.RF_slider_scaling + 1) # Integer division and round up
         self.RF_slider.setOrientation(PyQt5.QtCore.Qt.Horizontal)
@@ -94,17 +92,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # DC Sliders
         self.DC_slider_scaling = 1/200
-
         self.DC_slider_high = QSlider(self)
         self.DC_slider_high.setMinimum(0)
-        self.DC_slider_high.setMaximum(200)
+        self.DC_slider_high.setMaximum(int(1/self.DC_slider_scaling))
         self.DC_slider_high.setValue(0)
         self.DC_slider_high.setOrientation(PyQt5.QtCore.Qt.Horizontal)
         self.DC_slider_high.valueChanged.connect(self.eventDCSliderMove)
 
         self.DC_slider_low = QSlider(self)
         self.DC_slider_low.setMinimum(0)
-        self.DC_slider_low.setMaximum(200)
+        self.DC_slider_low.setMaximum(int(1/self.DC_slider_scaling))
         self.DC_slider_low.setValue(0)
         self.DC_slider_low.setOrientation(PyQt5.QtCore.Qt.Horizontal)
         self.DC_slider_low.valueChanged.connect(self.eventDCSliderMove)
@@ -114,29 +111,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self.check_follow.setCheckState(QtCore.Qt.Checked)
         self.check_follow.stateChanged.connect(self.eventOnCheckChange)
 
-        # Voltage readout
-        # self.label_voltage = QLabel(self)
-        # self.label_voltage.setText("RF: x\nDC1: y\DC2: z")
-        # self.label_voltage.setFont(lfont)
+        # Voltage readout - QLineEdit https://www.tutorialspoint.com/pyqt/pyqt_qlineedit_widget.htm
+        # QLineEdit objects are created and a validator makes sure that inserted values are real numbers (double) within a certain range, and aligns to the right.
         self.field_RF_voltage = QLineEdit(self)
         self.field_RF_voltage.setValidator(QDoubleValidator(0.0, 2000.0, 1))
-        self.field_RF_voltage.setFont(lfont)
         self.field_RF_voltage.setAlignment(QtCore.Qt.AlignRight)
         self.field_RF_voltage.returnPressed.connect(self.eventManualRF)
 
         self.field_DC1_voltage = QLineEdit(self)
-        self.field_DC1_voltage.setValidator(QDoubleValidator(0.0, 2000.0, 1))
-        self.field_DC1_voltage.setFont(lfont)
+        self.field_DC1_voltage.setValidator(QDoubleValidator(-2000.0, 2000.0, 1))
         self.field_DC1_voltage.setAlignment(QtCore.Qt.AlignRight)
         self.field_DC1_voltage.returnPressed.connect(self.eventManualDC(1))
 
         self.field_DC2_voltage = QLineEdit(self)
-        self.field_DC2_voltage.setValidator(QDoubleValidator(0.0, 2000.0, 1))
-        self.field_DC2_voltage.setFont(lfont)
+        self.field_DC2_voltage.setValidator(QDoubleValidator(-2000.0, 2000.0, 1))
         self.field_DC2_voltage.setAlignment(QtCore.Qt.AlignRight)
         self.field_DC2_voltage.returnPressed.connect(self.eventManualDC(2))
 
-        # Mass selection
+        # Mass selection - a QSpinBox is an integer QLineEdit, but with the up/down-arrow buttons
         self.field_low_mass = QSpinBox(self)
         self.field_low_mass.setMaximum(10000)
         self.field_low_mass.setValue(int(self.ms[0]/amu))
@@ -163,15 +155,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.label_settings.setFont(sfont)
         
         # Layout setup
-        self.hbox = QHBoxLayout(self.centralwidget) 
+        # Divides the main widget (self.central_widget) into two - a QHBoxLayout with the matplotlib canvas and a QGroupBox for the settings/parameters 
+        self.hbox = QHBoxLayout(self.central_widget) 
         self.hbox.addWidget(self.canvas)
         self.horizontalGroupBox = QGroupBox("Settings")
         self.hbox.addWidget(self.horizontalGroupBox)
 
+        # Creates a layout (QFormLayout) for the QGroupBox with the parameters
         self.main_vertical_layout = QFormLayout()
         self.horizontalGroupBox.setLayout(self.main_vertical_layout)
         
         # Settings setup
+        # The syntax is simple - to add an object (eg. a text field or a slider) to the settings layout, self.main_vertical_layout.addRow is called with the object as a parameter
+        # If a label is wanted for the object a string can be included as the first parameter.
         self.main_vertical_layout.addRow("High mass", self.field_high_mass)
         self.main_vertical_layout.addRow("Target mass", self.field_target_mass)
         self.main_vertical_layout.addRow("Low mass", self.field_low_mass)
@@ -180,7 +176,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.main_vertical_layout.addRow(mass_button)
 
         self.main_vertical_layout.addRow("Follow graph", self.check_follow)
-
         self.main_vertical_layout.addRow("RF V-Tuning", self.RF_slider)
         self.main_vertical_layout.addRow("DC1 V-Tuning", self.DC_slider_high)
         self.main_vertical_layout.addRow("DC2 V-Tuning", self.DC_slider_low)
@@ -189,11 +184,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.main_vertical_layout.addRow("DC 2: ", self.field_DC2_voltage)
         self.main_vertical_layout.addRow(self.label_settings)
 
-        # Set fonts(large) for labels
+        # Fonts are changed, to the before defined, for all the labels and relevant objects (input fields) using a quick for loop
+        # Set fonts (large) for labels
         for w in (self.field_RF_voltage, self.field_DC1_voltage, self.field_DC2_voltage):
             self.main_vertical_layout.labelForField(w).setFont(lfont)
+            w.setFont(lfont)
 
-        # Set fonts(small) for the labels 
+        # Set fonts (small) for the labels 
         for w in (self.RF_slider, self.DC_slider_high, self.DC_slider_low, self.check_follow):
             self.main_vertical_layout.labelForField(w).setFont(sfont)
 
@@ -202,30 +199,40 @@ class MainWindow(QtWidgets.QMainWindow):
             self.main_vertical_layout.labelForField(w).setFont(sfont)
             w.setFont(sfont)
 
+    # Event: called when the check box changes state
     def eventOnCheckChange(self):
         self.eventManualRF()
-    def eventRFSliderMove(self):
-        
-        q_to_V = (self.ms[2]*Omega**2*(r0**2 + 2*z0**2)/(8*self.charge))
-        self.RF_q = self.crossings[1]*self.RF_slider.value()*self.RF_slider_scaling
-        self.updateDCRange()
 
+    # Event: called when the RF slider is moved
+    def eventRFSliderMove(self):
+        # Updates the RF_q value to percentage (self.RF_slider.value()*self.RF_slider_scaling) of the second crossing point
+        self.RF_q = self.crossings[1]*self.RF_slider.value()*self.RF_slider_scaling
+ 
+        self.updateDCRange()
         self.updatePlot()
         self.updateReadout()
+    
+    # Event: called when the DC slider is moved
     def eventDCSliderMove(self):
         self.updatePlot()
         self.updateReadout()
+
+    # Event: called when the RF field value is changed manually, ie. not via the slider.
+    # Value of the field as a real number (float) -> Mathieu q value -> percentage of the slider -> slider value and rounds up  
     def eventManualRF(self):
         V_to_q = 8*self.charge/(self.ms[2]*Omega**2*(r0**2 + 2*z0**2))
         self.RF_slider.setValue((float(self.field_RF_voltage.text())*V_to_q/self.crossings[1])/self.RF_slider_scaling + 1)
         self.eventRFSliderMove()
+    
+    # Event: called when either of the DC field value is changed manually, ie. not via the slider.
+    # Is a wrapper function, it returns a function, which is why the connect method includes this method with a parameter n, which describes the relevant DC value
     def eventManualDC(self, n):
         def specific():
-            # Convert voltage to percentage
+            # If DC follows the graph:
             if(self.check_follow.checkState() == QtCore.Qt.Checked):
-                print(self.DC_Range)
                 q_to_V = (self.ms[2]*Omega**2*(r0**2 + 2*z0**2)/(8*self.charge))
                 
+                # Decides which of the graphs is relevant on the specific side of the first crossing
                 DC_voltage_high_m = 0
                 if(self.RF_q > self.crossings[0]):
                     DC_voltage_high_m = -mathieu_b(1, self.RF_q)*q_to_V/2
@@ -247,6 +254,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.DC_slider_low.setValue((abs(float(self.field_DC2_voltage.text()))/(0.75*self.DC_Range))/self.DC_slider_scaling + 1)
             self.eventDCSliderMove()
         return specific
+
+    # Update: updates the range of the two DC values.
+    # check_follow == Checked: the range is defined by the max and min value of DC in the stable region @ that specific RF_q value
+    # check_follow != Checked: as above but absolute max and min, unrelated to the value of RF_q
     def updateDCRange(self):
         q_to_V = (self.ms[2]*Omega**2*(r0**2 + 2*z0**2)/(8*self.charge))
         if(self.check_follow.checkState() == QtCore.Qt.Checked):
@@ -263,6 +274,7 @@ class MainWindow(QtWidgets.QMainWindow):
             DC_voltage_low_m = -mathieu_a(0, self.crossings[2])*q_to_V/2
             self.DC_Range = DC_voltage_low_m-DC_voltage_high_m
 
+    # Update: updates the mass values in SI and updates relevant parameters
     def updateMass(self):
         self.ms[0] = self.field_low_mass.value()*amu
         self.ms[1] = self.field_high_mass.value()*amu
@@ -273,9 +285,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.updatePlot()
         self.updateReadout()
+    # Update: updates the RF, DC1 and DC2 value fields
     def updateReadout(self):
         q_to_V = (self.ms[2]*Omega**2*(r0**2 + 2*z0**2)/(8*self.charge))
-        # self.RF_q = self.crossings[1]*self.RF_slider.value()*self.RF_slider_scaling
         
         DC_voltage_high_m = 0
         DC_voltage_low_m = 0
@@ -297,13 +309,15 @@ class MainWindow(QtWidgets.QMainWindow):
         # TODO: Check stability of high and low
 
 
-    # TODO: Port updatePort to PyQtGraph
+    # TODO: Port updatePort to PyQtGraph - is maybe? faster
     def updatePlotPyQT(self):
         return 0
+    # Update: redraws the plot
     def updatePlot(self):
+        # Clear the canvas
         self.canvas.axes.cla()
+        
         q_to_Vs = (self.ms*Omega**2*(r0**2 + 2*z0**2)/(8*self.charge))
-        #Plotting
         for q_to_V, c in zip(q_to_Vs, self.cs):
             # Z stable solutions between
             self.canvas.axes.plot(self.qs[0]*q_to_V, self.mathieuCurves[0]*q_to_V/2, c=c, lw=1.5)
@@ -313,7 +327,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.canvas.axes.plot(self.qs[2]*q_to_V, self.mathieuCurves[2]*q_to_V, c=c, lw=1.5)
             self.canvas.axes.plot(self.qs[3]*q_to_V, self.mathieuCurves[3]*q_to_V, c=c, lw=1.5)
 
-        # self.RF_q = self.crossings[1]*self.RF_slider.value()*self.RF_slider_scaling
         
         # Plot DC crosses
         if(self.check_follow.checkState() == QtCore.Qt.Checked):
@@ -337,7 +350,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.axes.grid()
         self.canvas.draw()
     
-    # Zoom functionality
+    # Event: mouse and wheel position -> zoom functionality
     def wheelEvent(self, event):
         pos = [event.pos().x(), event.pos().y()]
         canvasSize = self.canvas.get_width_height()
@@ -356,7 +369,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return super().wheelEvent(event)
 
-    # On window resize update plot size
+    # Event: On window resize update plot size
     def resizeEvent(self, event):
         size = [event.size().width(), event.size().height()]
         self.canvas.figure.set_size_inches(size[0]*0.7/self.DPI, size[1]/self.DPI)
@@ -365,6 +378,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hbox.addWidget(self.horizontalGroupBox)
         return super().resizeEvent(event)
 
+# 'Main' function called upon execution
 if __name__ == '__main__':
     app = QApplication.instance()
     if app is None:
@@ -373,6 +387,7 @@ if __name__ == '__main__':
         print('QApplication instance already exists: %s' % str(app))
     app.aboutToQuit.connect(app.deleteLater)
 
+    # Here the actual object, of the MainWindow class, is made.
     window = MainWindow()
 
     app.exec_()
