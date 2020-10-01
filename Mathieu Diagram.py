@@ -1,5 +1,8 @@
 # Author: Thomas Toft Lindkvist
 
+import os
+import time
+
 # Matplotlib packages
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -48,6 +51,10 @@ class MplCanvas(FigureCanvasQTAgg):
         self.axes = fig.add_subplot(111)
         super(MplCanvas, self).__init__(fig)
         self.setParent(parent)
+    def savePlot(self):
+        filename = "MSD-"+str((int)(time.time()))+".pdf"
+        self.figure.savefig(filename, dpi=100)
+        print("File saved @ " + os.path.abspath(filename))
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -57,7 +64,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Mathieu Stability Diagram")
         self.setMouseTracking(True)
 
-        self.qs = [np.linspace(0, 1.23978, 100), np.linspace(0.780906, 1.351218, 100), np.linspace(0, 0.780906), np.linspace(1.23978, 1.351218)]
+        self.qs = [np.linspace(0, 1.23978, 100), np.linspace(0.780906, 1.351218, 100), np.linspace(0, 0.780906, 100), np.linspace(1.23978, 1.351218, 100)]
         self.mathieuCurves = [-mathieu_a(0, self.qs[0]), -mathieu_b(1, self.qs[1]), mathieu_a(0, self.qs[2]/2), mathieu_b(1, self.qs[3]/2)]
         
         # Constants in the q-a plane, where the different mathieu curves cross and form the stable region.
@@ -142,12 +149,18 @@ class MainWindow(QtWidgets.QMainWindow):
         # Charge selection
         self.field_charge = QSpinBox(self)
         self.field_charge.setValue(int(self.charge/ec))
+        self.field_charge.setMinimum(1)
 
 
         # Update button
-        mass_button = QPushButton('Update particles', self)
+        mass_button = QPushButton('Update ions', self)
         mass_button.clicked.connect(self.updateMass)
         mass_button.setFont(sfont)
+
+        # Save plot button
+        save_button = QPushButton("Save plot", self)
+        save_button.clicked.connect(self.canvas.savePlot)
+        save_button.setFont(sfont)
 
         # Settings print
         self.label_settings = QLabel(self)
@@ -179,9 +192,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.main_vertical_layout.addRow("RF V-Tuning", self.RF_slider)
         self.main_vertical_layout.addRow("DC1 V-Tuning", self.DC_slider_high)
         self.main_vertical_layout.addRow("DC2 V-Tuning", self.DC_slider_low)
-        self.main_vertical_layout.addRow("RF V: ", self.field_RF_voltage)
+        self.main_vertical_layout.addRow("RF: ", self.field_RF_voltage)
         self.main_vertical_layout.addRow("DC 1: ", self.field_DC1_voltage)
         self.main_vertical_layout.addRow("DC 2: ", self.field_DC2_voltage)
+
+        self.main_vertical_layout.addRow(save_button)
+
         self.main_vertical_layout.addRow(self.label_settings)
 
         # Fonts are changed, to the before defined, for all the labels and relevant objects (input fields) using a quick for loop
@@ -281,6 +297,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ms[2] = self.field_target_mass.value()*amu
         self.charge = self.field_charge.value()*ec
         
+        # Update plot axes 
+        q_to_V = (self.ms[2]*Omega**2*(r0**2 + 2*z0**2)/(8*self.charge))
+
+        self.plot_lims[0][0] = 0
+        self.plot_lims[0][1] = self.crossings[2]*1.1*q_to_V
+        self.plot_lims[1][0] = -mathieu_a(0, self.crossings[1])*q_to_V/2*1.1
+        self.plot_lims[1][1] = mathieu_a(0, self.crossings[1]/2)*q_to_V/2*1.1
+
         self.updateDCRange()
 
         self.updatePlot()
@@ -345,8 +369,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Set axes
         self.canvas.axes.set_xlim(self.plot_lims[0])
         self.canvas.axes.set_ylim(self.plot_lims[1])
-        self.canvas.axes.set_xlabel("RF Voltage")
-        self.canvas.axes.set_ylabel("DC Voltage")
+        self.canvas.axes.set_xlabel("RF Voltage (V)")
+        self.canvas.axes.set_ylabel("DC Voltage (V)")
         self.canvas.axes.grid()
         self.canvas.draw()
     
@@ -354,9 +378,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def wheelEvent(self, event):
         pos = [event.pos().x(), event.pos().y()]
         canvasSize = self.canvas.get_width_height()
-        if(0 <= pos[0] and pos[0] <= canvasSize[0] and 0 <= pos[1] and pos[1] <= canvasSize[1]): # If the mouse is on the canvas, zoom
-            x_frac = pos[0]/canvasSize[0]
-            y_frac = pos[1]/canvasSize[1]
+        borderP = [0.12, 0.12]
+        if(canvasSize[0]*borderP[0] <= pos[0] and pos[0] <= canvasSize[0]*(1-borderP[0]) and canvasSize[1]*borderP[1] <= pos[1] and pos[1] <= canvasSize[1]*(1-borderP[1])): # If the mouse is on the canvas, zoom
+            x_frac = (pos[0]-canvasSize[0]*borderP[0])/(canvasSize[0]*(1-borderP[0]))
+            y_frac = (pos[1]-canvasSize[1]*borderP[1])/(canvasSize[1]*(1-borderP[1]))
             
             sign = np.sign(event.angleDelta().y())
             width = self.plot_lims[0][1]-self.plot_lims[0][0]

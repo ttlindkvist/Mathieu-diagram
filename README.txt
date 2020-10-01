@@ -8,14 +8,12 @@ General:
     - More commenting
 
 File system:
-    - Read exp setup from file
+    - Read exp setup from file?
     - Read/save latest specific setup from/to file
-    - Save plot
 
 Specific functionality:
     - Smoother tuning?
     - Check stability of masses - with color coordination
-    - Auto focus on target mass change
 
 Code cleanup
     - remove functionality overlap in methods
