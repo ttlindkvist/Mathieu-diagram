@@ -12,7 +12,7 @@ File system:
     - Read/save latest specific setup from/to file
 
 Specific functionality:
-    - Smoother tuning?
+    - Smoother tuning / non linear DC tuning?
     - Check stability of masses - with color coordination
 
 Code cleanup
