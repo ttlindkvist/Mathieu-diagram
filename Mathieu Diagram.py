@@ -369,7 +369,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Set axes
         self.canvas.axes.set_xlim(self.plot_lims[0])
         self.canvas.axes.set_ylim(self.plot_lims[1])
-        self.canvas.axes.set_xlabel("RF Voltage (V)")
+        self.canvas.axes.set_xlabel("RF Amplitude (V)")
         self.canvas.axes.set_ylabel("DC Voltage (V)")
         self.canvas.axes.grid()
         self.canvas.draw()
